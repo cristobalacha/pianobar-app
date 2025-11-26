@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Bar Chord App</title>
+    <style>
+        /* ESTILOS (El diseño visual oscuro) */
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --accent-color: #bb86fc;
+            --card-bg: #1e1e1e;
+            --highlight: #03dac6;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
+        }
+
+        /* VISTA BUSCADOR */
+        #search-view {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        input#search-box {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2rem;
+            background: var(--card-bg);
+            border: 1px solid #333;
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        #song-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .song-item {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+        }
+        .song-item:active { background-color: #333; }
+        .song-title { font-weight: bold; font-size: 1.1rem; color: var(--accent-color); }
+        .song-artist { font-size: 0.9rem; color: #888; }
+
+        /* VISTA PERFORMANCE (CANCION) */
+        #performance-view {
+            display: none; 
+            flex-direction: column;
+            height: 100%;
+        }
+        #controls-header {
+            background-color: #1f1f1f;
+            padding: 10px;
+            border-bottom: 2px solid var(--accent-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .transposer-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #current-key { font-weight: bold; color: var(--highlight); min-width: 40px; text-align: center;}
+        
+        #song-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            white-space: pre-wrap; 
+            font-family: monospace; 
+            line-height: 1.5;
+        }
+
+        /* Estilos dentro de la canción */
+        .section-title {
+            color: var(--highlight);
+            font-weight: bold;
+            display: block;
+            margin-top: 25px;
+            margin-bottom: 5px;
+            font-family: sans-serif;
+            border-bottom: 1px solid #333;
+            font-size: 1.1em;
+        }
+        .chord { color: var(--text-color); font-weight: bold; }
+        
+        /* FOOTER CON SLIDER */
+        #footer-controls {
+            background: #1f1f1f;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #size-slider { width: 100%; }
+
+    </style>
+</head>
+<body>
+
+    <div id="search-view">
+        <h2 style="text-align: center; margin-top:0;">🎹 Piano Bar Setlist</h2>
+        <input type="text" id="search-box" placeholder="Buscar canción o artista...">
+        <div id="song-list">
+            <div style="text-align:center; margin-top:20px; color:#666;">Cargando setlist...</div>
+        </div>
+    </div>
+
+    <div id="performance-view">
+        <div id="controls-header">
+            <button class="btn" onclick="showSearch()">🔍 Volver</button>
+            <div style="text-align:center; max-width: 50%;">
+                <div id="perf-title" style="font-weight:bold; font-size:0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Titulo</div>
+                <div id="perf-artist" style="font-size:0.7rem; color:#888;">Artista</div>
+            </div>
+            <div class="transposer-controls">
+                <button class="btn" onclick="transpose(-1)">-</button>
+                <span id="current-key">C</span>
+                <button class="btn" onclick="transpose(1)">+</button>
+            </div>
+        </div>
+
+        <div id="song-content">
+            </div>
+
+        <div id="footer-controls">
+            <span style="font-size:0.8rem">Tamaño:</span>
+            <input type="range" id="size-slider" min="10" max="40" value="16">
+        </div>
+    </div>
+
+    <script>
+        // *** TU ENLACE YA PUESTO AQUÍ ***
+        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQJcnk6HNB2qbDQyv8UANUImQevHtF56IA_gGip8siwvRHXslaicd9aLU3vwer9UGeVV1gi5EnhcnD0/pub?output=csv";
+        
+        let allSongs = [];
+        let currentSong = null;
+        let transposeSteps = 0;
+
+        const notesSharp = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const notesFlat  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+        // 1. CARGAR DATOS
+        async function loadSongs() {
+            try {
+                const response = await fetch(SHEET_CSV_URL);
+                if (!response.ok) throw new Error("Error de red");
+                const data = await response.text();
+                parseCSV(data);
+            } catch (error) {
+                document.getElementById('song-list').innerHTML = `
+                    <div style='text-align:center; color:#ff6b6b; padding:20px'>
+                        <strong>Error cargando canciones.</strong><br><br>
+                        Si estás abriendo este archivo desde tu computadora (doble click), 
+                        algunos navegadores bloquean la conexión por seguridad.<br><br>
+                        Intenta usar Firefox, o subir este archivo a un hosting gratuito.
+                        <br><br>Detalle: ${error.message}
+                    </div>`;
+                console.error(error);
+            }
+        }
+
+        // *** NUEVO PARSER DE CSV ROBUSTO ***
+        // Este código lee caracter por caracter para respetar comillas y saltos de linea
+        function parseCSV(text) {
+            let arr = [];
+            let quote = false; 
+            let row = 0, col = 0;
+            
+            // Inicializar primera fila y columna
+            arr[row] = [];
+            arr[row][col] = "";
+
+            for (let c = 0; c < text.length; c++) {
+                let cc = text[c];     // Caracter actual
+                let nc = text[c+1];   // Siguiente caracter
+
+                // Manejo de comillas dobles ("") dentro de comillas
+                if (cc == '"' && quote && nc == '"') { 
+                    arr[row][col] += cc; ++c; continue; 
+                }
+                
+                // Comienzo o fin de celda con comillas
+                if (cc == '"') { quote = !quote; continue; }
+                
+                // Separador de columna (coma)
+                if (cc == ',' && !quote) { ++col; arr[row][col] = ""; continue; }
+                
+                // Separador de fila (enter)
+                if (cc == '\n' && !quote) { 
+                    ++row; col = 0; arr[row] = []; arr[row][col] = ""; continue; 
+                }
+                // Ignorar retorno de carro \r
+                if (cc == '\r' && !quote) { continue; }
+
+                // Caracter normal
+                arr[row][col] += cc;
+            }
+
+            // Convertir la matriz de datos en objetos de canciones
+            allSongs = [];
+            // Empezamos en i=1 para saltar los encabezados
+            for (let i = 1; i < arr.length; i++) {
+                const cols = arr[i];
+                // Verificamos que la fila tenga datos suficientes (al menos 4 columnas)
+                if (cols.length < 4) continue;
+                if (!cols[0]) continue; // Saltar filas vacias
+
+                allSongs.push({
+                    id: i,
+                    title: cols[0],
+                    artist: cols[1],
+                    originalKey: cols[2] ? cols[2].trim() : "C",
+                    content: cols[3]
+                });
+            }
+            
+            if (allSongs.length === 0) {
+                 document.getElementById('song-list').innerHTML = "<div style='text-align:center; padding:20px'>No se encontraron canciones. Revisa el formato del Excel.</div>";
+            } else {
+                renderList(allSongs);
+            }
+        }
+
+        // 2. RENDERIZADO LISTA
+        function renderList(songs) {
+            const listEl = document.getElementById('song-list');
+            listEl.innerHTML = "";
+            songs.forEach(song => {
+                const item = document.createElement('div');
+                item.className = 'song-item';
+                item.innerHTML = `<div class="song-title">${song.title}</div><div class="song-artist">${song.artist}</div>`;
+                item.onclick = () => openSong(song);
+                listEl.appendChild(item);
+            });
+        }
+
+        // 3. BUSCADOR
+        document.getElementById('search-box').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = allSongs.filter(s => 
+                (s.title && s.title.toLowerCase().includes(term)) || 
+                (s.artist && s.artist.toLowerCase().includes(term))
+            );
+            renderList(filtered);
+        });
+
+        // 4. ABRIR CANCIÓN
+        function openSong(song) {
+            currentSong = song;
+            transposeSteps = 0;
+            
+            document.getElementById('search-view').style.display = 'none';
+            document.getElementById('performance-view').style.display = 'flex';
+            
+            document.getElementById('perf-title').innerText = song.title;
+            document.getElementById('perf-artist').innerText = song.artist;
+            
+            renderChordSheet();
+        }
+
+        function showSearch() {
+            document.getElementById('performance-view').style.display = 'none';
+            document.getElementById('search-view').style.display = 'flex';
+        }
+
+        // 5. RENDERIZADO DEL CIFRADO
+        function renderChordSheet() {
+            if (!currentSong) return;
+
+            const currentKeyDisplay = transposeNote(currentSong.originalKey, transposeSteps);
+            document.getElementById('current-key').innerText = currentKeyDisplay;
+
+            let htmlContent = currentSong.content;
+
+            // Detectar secciones entre corchetes []
+            htmlContent = htmlContent.replace(/\[(.*?)\]/g, '<span class="section-title">$1</span>');
+
+            // Detectar acordes y transponerlos
+            const chordRegex = /\b[A-G](?:#|b)?(?:m|maj|dim|aug|sus|add|alt|[0-9])*(?:\/[A-G](?:#|b)?)?\b/g;
+
+            htmlContent = htmlContent.replace(chordRegex, (match) => {
+                if (match.includes('/')) {
+                    const parts = match.split('/');
+                    return transposeNote(parts[0], transposeSteps) + '/' + transposeNote(parts[1], transposeSteps);
+                }
+                return transposeNote(match, transposeSteps);
+            });
+
+            document.getElementById('song-content').innerHTML = htmlContent;
+        }
+
+        // 6. LOGICA DE TRANSPOSICIÓN
+        function transpose(steps) {
+            transposeSteps += steps;
+            renderChordSheet();
+        }
+
+        function transposeNote(noteStr, semitones) {
+            const match = noteStr.match(/^([A-G](?:#|b)?)(.*)$/);
+            if (!match) return noteStr; 
+
+            const root = match[1];
+            const suffix = match[2];
+
+            let index = notesSharp.indexOf(root);
+            if (index === -1) index = notesFlat.indexOf(root);
+            if (index === -1) return noteStr; 
+
+            let newIndex = (index + semitones) % 12;
+            if (newIndex < 0) newIndex += 12;
+
+            const useFlat = root.includes('b') || root === 'F' || (currentSong.originalKey.includes('b') && !currentSong.originalKey.includes('#'));
+            const newRoot = useFlat ? notesFlat[newIndex] : notesSharp[newIndex];
+
+            return `<span class="chord">${newRoot}${suffix}</span>`;
+        }
+
+        // 7. SLIDER
+        document.getElementById('size-slider').addEventListener('input', (e) => {
+            document.getElementById('song-content').style.fontSize = e.target.value + 'px';
+        });
+
+        loadSongs();
+    </script>
+</body>
+</html>
