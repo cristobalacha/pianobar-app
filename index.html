@@ -2,16 +2,17 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Piano Bar Chord App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Piano Bar Setlist</title>
     <style>
-        /* ESTILOS (El diseño visual oscuro) */
+        /* ESTILOS GENERALES */
         :root {
             --bg-color: #121212;
             --text-color: #e0e0e0;
-            --accent-color: #bb86fc;
+            --accent-color: #bb86fc; /* Morado botones */
             --card-bg: #1e1e1e;
-            --highlight: #03dac6;
+            --highlight: #03dac6; /* Turquesa titulos */
+            --chord-color: #ffffff; /* Blanco brillante para acordes */
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -19,127 +20,227 @@
             color: var(--text-color);
             margin: 0;
             padding: 0;
-            height: 100vh;
+            /* Usamos 100dvh para que ocupe la pantalla real del movil descartando la barra de url */
+            height: 100dvh; 
             display: flex;
             flex-direction: column;
             overflow: hidden; 
         }
 
-        /* VISTA BUSCADOR */
+        /* --- VISTA BUSCADOR --- */
         #search-view {
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             height: 100%;
+            box-sizing: border-box;
         }
+        h2 { margin: 10px 0; text-align: center; font-size: 1.2rem; color: var(--highlight); }
+        
         input#search-box {
             width: 100%;
-            padding: 15px;
-            font-size: 1.2rem;
+            padding: 12px;
+            font-size: 1.1rem;
             background: var(--card-bg);
             border: 1px solid #333;
             color: white;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             box-sizing: border-box;
+            outline: none;
         }
+        input#search-box:focus { border-color: var(--accent-color); }
+
         #song-list {
             flex: 1;
             overflow-y: auto;
+            /* Scroll suave */
+            -webkit-overflow-scrolling: touch; 
         }
         .song-item {
-            padding: 15px;
+            padding: 12px;
             border-bottom: 1px solid #333;
             cursor: pointer;
+            display: flex;
+            flex-direction: column;
         }
-        .song-item:active { background-color: #333; }
-        .song-title { font-weight: bold; font-size: 1.1rem; color: var(--accent-color); }
-        .song-artist { font-size: 0.9rem; color: #888; }
+        .song-item:active { background-color: #2a2a2a; }
+        .song-title { font-weight: bold; font-size: 1rem; color: var(--text-color); }
+        .song-artist { font-size: 0.8rem; color: #888; margin-top: 2px; }
 
-        /* VISTA PERFORMANCE (CANCION) */
+        /* --- VISTA PERFORMANCE (CANCION) --- */
         #performance-view {
             display: none; 
             flex-direction: column;
             height: 100%;
         }
+
+        /* CABECERA FIJA */
         #controls-header {
             background-color: #1f1f1f;
-            padding: 10px;
-            border-bottom: 2px solid var(--accent-color);
+            padding: 8px 12px;
+            border-bottom: 1px solid #333;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            height: 60px; /* Altura fija para evitar saltos */
+            box-sizing: border-box;
+            flex-shrink: 0; /* No encoger */
         }
+
         .btn {
             background: #333;
             color: white;
             border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-size: 1rem;
+            height: 40px;
+            padding: 0 15px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0; /* Botones no se aplastan */
         }
+        .btn:active { background-color: var(--accent-color); color: black; }
+
+        .song-info-display {
+            flex: 1; /* Toma el espacio sobrante */
+            margin: 0 10px;
+            text-align: center;
+            overflow: hidden; /* Ocultar lo que sobra */
+            min-width: 0; /* Permite al flex item encogerse mas alla de su contenido */
+        }
+        #perf-title {
+            font-weight:bold; 
+            font-size: 1rem; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; /* Puntos suspensivos si es largo */
+        }
+        #perf-artist {
+            font-size: 0.75rem; 
+            color:#888;
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+        }
+
         .transposer-controls {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 5px;
+            flex-shrink: 0;
         }
-        #current-key { font-weight: bold; color: var(--highlight); min-width: 40px; text-align: center;}
-        
+        .key-display { 
+            font-weight: bold; 
+            color: var(--highlight); 
+            width: 35px; 
+            text-align: center;
+            font-size: 1.1rem;
+        }
+        /* Corrección del bug visual del acorde en la esquina */
+        .key-display .chord { color: var(--highlight) !important; } 
+
+        /* CONTENIDO SCROLLABLE */
         #song-content {
-            flex: 1;
-            padding: 20px;
+            flex: 1; /* Ocupa todo el alto disponible */
+            padding: 15px;
             overflow-y: auto;
             white-space: pre-wrap; 
-            font-family: monospace; 
-            line-height: 1.5;
+            font-family: 'Courier New', Courier, monospace; /* Fuente mono para alinear */
+            line-height: 1.4;
+            color: var(--text-color);
         }
 
-        /* Estilos dentro de la canción */
+        /* Estilos de las partes [Intro], [A], etc */
         .section-title {
             color: var(--highlight);
-            font-weight: bold;
+            font-family: sans-serif;
+            font-weight: 800;
+            font-size: 1.2em;
             display: block;
             margin-top: 25px;
-            margin-bottom: 5px;
-            font-family: sans-serif;
+            margin-bottom: 8px;
             border-bottom: 1px solid #333;
-            font-size: 1.1em;
+            padding-bottom: 2px;
         }
-        .chord { color: var(--text-color); font-weight: bold; }
         
-        /* FOOTER CON SLIDER */
+        /* CORRECCIÓN DE COLOR PARA [A], [B] */
+        /* Si un acorde cae dentro de un titulo, hereda el color del titulo (Turquesa) */
+        .section-title .chord {
+            color: inherit !important;
+            font-family: sans-serif !important;
+        }
+
+        /* Acordes normales */
+        .chord { 
+            color: var(--chord-color); 
+            font-weight: 700;
+        }
+        
+        /* FOOTER FIJO (SLIDER) */
         #footer-controls {
             background: #1f1f1f;
-            padding: 10px 20px;
+            padding: 10px 15px;
+            border-top: 1px solid #333;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
+            flex-shrink: 0; /* No encoger */
+            height: 50px;
+            box-sizing: border-box;
         }
-        #size-slider { width: 100%; }
+        #footer-controls span { font-size: 0.8rem; color: #888; white-space: nowrap;}
+        
+        /* Slider personalizado */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--highlight);
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+        }
 
     </style>
 </head>
 <body>
 
     <div id="search-view">
-        <h2 style="text-align: center; margin-top:0;">🎹 Piano Bar Setlist</h2>
+        <h2>🎹 Piano Bar</h2>
         <input type="text" id="search-box" placeholder="Buscar canción o artista...">
         <div id="song-list">
-            <div style="text-align:center; margin-top:20px; color:#666;">Cargando setlist...</div>
+            <div style="text-align:center; margin-top:50px; color:#666;">Cargando repertorio...</div>
         </div>
     </div>
 
     <div id="performance-view">
         <div id="controls-header">
-            <button class="btn" onclick="showSearch()">🔍 Volver</button>
-            <div style="text-align:center; max-width: 50%;">
-                <div id="perf-title" style="font-weight:bold; font-size:0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Titulo</div>
-                <div id="perf-artist" style="font-size:0.7rem; color:#888;">Artista</div>
+            <button class="btn" onclick="showSearch()">
+                <span style="font-size:1.2rem">🔙</span>
+            </button>
+            
+            <div class="song-info-display">
+                <div id="perf-title">Titulo</div>
+                <div id="perf-artist">Artista</div>
             </div>
+
             <div class="transposer-controls">
                 <button class="btn" onclick="transpose(-1)">-</button>
-                <span id="current-key">C</span>
+                <div id="current-key" class="key-display">C</div>
                 <button class="btn" onclick="transpose(1)">+</button>
             </div>
         </div>
@@ -148,18 +249,19 @@
             </div>
 
         <div id="footer-controls">
-            <span style="font-size:0.8rem">Tamaño:</span>
-            <input type="range" id="size-slider" min="10" max="40" value="16">
+            <span>🔎 Zoom</span>
+            <input type="range" id="size-slider" min="12" max="36" value="16">
         </div>
     </div>
 
     <script>
-        // *** TU ENLACE YA PUESTO AQUÍ ***
+        // *** CONFIGURACIÓN ***
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQJcnk6HNB2qbDQyv8UANUImQevHtF56IA_gGip8siwvRHXslaicd9aLU3vwer9UGeVV1gi5EnhcnD0/pub?output=csv";
         
         let allSongs = [];
         let currentSong = null;
         let transposeSteps = 0;
+        let wakeLock = null; // Variable para mantener la pantalla encendida
 
         const notesSharp = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
         const notesFlat  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -174,79 +276,39 @@
             } catch (error) {
                 document.getElementById('song-list').innerHTML = `
                     <div style='text-align:center; color:#ff6b6b; padding:20px'>
-                        <strong>Error cargando canciones.</strong><br><br>
-                        Si estás abriendo este archivo desde tu computadora (doble click), 
-                        algunos navegadores bloquean la conexión por seguridad.<br><br>
-                        Intenta usar Firefox, o subir este archivo a un hosting gratuito.
-                        <br><br>Detalle: ${error.message}
+                        Error cargando.<br>Intenta recargar.
                     </div>`;
-                console.error(error);
             }
         }
 
-        // *** NUEVO PARSER DE CSV ROBUSTO ***
-        // Este código lee caracter por caracter para respetar comillas y saltos de linea
         function parseCSV(text) {
             let arr = [];
             let quote = false; 
             let row = 0, col = 0;
-            
-            // Inicializar primera fila y columna
-            arr[row] = [];
-            arr[row][col] = "";
+            arr[row] = []; arr[row][col] = "";
 
             for (let c = 0; c < text.length; c++) {
-                let cc = text[c];     // Caracter actual
-                let nc = text[c+1];   // Siguiente caracter
-
-                // Manejo de comillas dobles ("") dentro de comillas
-                if (cc == '"' && quote && nc == '"') { 
-                    arr[row][col] += cc; ++c; continue; 
-                }
-                
-                // Comienzo o fin de celda con comillas
+                let cc = text[c], nc = text[c+1];
+                if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
                 if (cc == '"') { quote = !quote; continue; }
-                
-                // Separador de columna (coma)
                 if (cc == ',' && !quote) { ++col; arr[row][col] = ""; continue; }
-                
-                // Separador de fila (enter)
-                if (cc == '\n' && !quote) { 
-                    ++row; col = 0; arr[row] = []; arr[row][col] = ""; continue; 
-                }
-                // Ignorar retorno de carro \r
+                if (cc == '\n' && !quote) { ++row; col = 0; arr[row] = []; arr[row][col] = ""; continue; }
                 if (cc == '\r' && !quote) { continue; }
-
-                // Caracter normal
                 arr[row][col] += cc;
             }
 
-            // Convertir la matriz de datos en objetos de canciones
             allSongs = [];
-            // Empezamos en i=1 para saltar los encabezados
             for (let i = 1; i < arr.length; i++) {
                 const cols = arr[i];
-                // Verificamos que la fila tenga datos suficientes (al menos 4 columnas)
-                if (cols.length < 4) continue;
-                if (!cols[0]) continue; // Saltar filas vacias
-
+                if (cols.length < 4 || !cols[0]) continue;
                 allSongs.push({
-                    id: i,
-                    title: cols[0],
-                    artist: cols[1],
-                    originalKey: cols[2] ? cols[2].trim() : "C",
-                    content: cols[3]
+                    id: i, title: cols[0], artist: cols[1], 
+                    originalKey: cols[2] ? cols[2].trim() : "C", content: cols[3]
                 });
             }
-            
-            if (allSongs.length === 0) {
-                 document.getElementById('song-list').innerHTML = "<div style='text-align:center; padding:20px'>No se encontraron canciones. Revisa el formato del Excel.</div>";
-            } else {
-                renderList(allSongs);
-            }
+            renderList(allSongs);
         }
 
-        // 2. RENDERIZADO LISTA
         function renderList(songs) {
             const listEl = document.getElementById('song-list');
             listEl.innerHTML = "";
@@ -259,7 +321,6 @@
             });
         }
 
-        // 3. BUSCADOR
         document.getElementById('search-box').addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             const filtered = allSongs.filter(s => 
@@ -269,8 +330,8 @@
             renderList(filtered);
         });
 
-        // 4. ABRIR CANCIÓN
-        function openSong(song) {
+        // 4. ABRIR CANCIÓN Y ACTIVAR WAKE LOCK
+        async function openSong(song) {
             currentSong = song;
             transposeSteps = 0;
             
@@ -281,26 +342,31 @@
             document.getElementById('perf-artist').innerText = song.artist;
             
             renderChordSheet();
+            requestWakeLock(); // Pedir pantalla encendida
         }
 
         function showSearch() {
             document.getElementById('performance-view').style.display = 'none';
             document.getElementById('search-view').style.display = 'flex';
+            document.getElementById('search-box').value = ""; // Limpiar busqueda opcional
+            renderList(allSongs); // Resetear lista
+            releaseWakeLock(); // Soltar pantalla encendida
         }
 
-        // 5. RENDERIZADO DEL CIFRADO
+        // 5. RENDERIZADO
         function renderChordSheet() {
             if (!currentSong) return;
 
+            // FIX: Usar innerHTML para interpretar el span de la nota
             const currentKeyDisplay = transposeNote(currentSong.originalKey, transposeSteps);
-            document.getElementById('current-key').innerText = currentKeyDisplay;
+            document.getElementById('current-key').innerHTML = currentKeyDisplay;
 
             let htmlContent = currentSong.content;
 
-            // Detectar secciones entre corchetes []
+            // Reemplazo de Títulos [A], [Coro], etc.
             htmlContent = htmlContent.replace(/\[(.*?)\]/g, '<span class="section-title">$1</span>');
 
-            // Detectar acordes y transponerlos
+            // Regex de acordes
             const chordRegex = /\b[A-G](?:#|b)?(?:m|maj|dim|aug|sus|add|alt|[0-9])*(?:\/[A-G](?:#|b)?)?\b/g;
 
             htmlContent = htmlContent.replace(chordRegex, (match) => {
@@ -314,7 +380,6 @@
             document.getElementById('song-content').innerHTML = htmlContent;
         }
 
-        // 6. LOGICA DE TRANSPOSICIÓN
         function transpose(steps) {
             transposeSteps += steps;
             renderChordSheet();
@@ -334,7 +399,8 @@
             let newIndex = (index + semitones) % 12;
             if (newIndex < 0) newIndex += 12;
 
-            const useFlat = root.includes('b') || root === 'F' || (currentSong.originalKey.includes('b') && !currentSong.originalKey.includes('#'));
+            // Lógica simple para elegir # o b
+            const useFlat = root.includes('b') || root === 'F' || (currentSong && currentSong.originalKey.includes('b'));
             const newRoot = useFlat ? notesFlat[newIndex] : notesSharp[newIndex];
 
             return `<span class="chord">${newRoot}${suffix}</span>`;
@@ -343,6 +409,32 @@
         // 7. SLIDER
         document.getElementById('size-slider').addEventListener('input', (e) => {
             document.getElementById('song-content').style.fontSize = e.target.value + 'px';
+        });
+
+        // 8. WAKE LOCK (Pantalla Encendida)
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Pantalla bloqueada activa');
+                }
+            } catch (err) {
+                console.log(`${err.name}, ${err.message}`);
+            }
+        }
+        
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release()
+                    .then(() => { wakeLock = null; });
+            }
+        }
+        
+        // Recuperar Wake Lock si se minimiza y vuelve
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
         });
 
         loadSongs();
